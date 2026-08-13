@@ -1,0 +1,34 @@
+{
+  "name": "open-clinic",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build && ait build",
+    "deploy": "ait deploy",
+    "lint": "eslint .",
+    "typecheck": "tsc -b --force",
+    "data": "node scripts/build-places.mjs",
+    "probe": "node scripts/build-places.mjs --probe",
+    "check:schedule": "node --experimental-strip-types scripts/check-schedule.ts"
+  },
+  "dependencies": {
+    "@apps-in-toss/web-framework": "^3.0.2",
+    "@emotion/react": "^11.0.0",
+    "@toss/tds-colors": "latest",
+    "@toss/tds-mobile": "latest",
+    "@toss/tds-mobile-ait": "latest",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  },
+  "devDependencies": {
+    "@apps-in-toss/devtools": "^3.0.2",
+    "@types/node": "^22.20.1",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "~5.7.2",
+    "vite": "^6.2.0"
+  }
+}
