@@ -26,6 +26,9 @@ export function DetailSheet({
         left: 12,
         right: 12,
         bottom: 12,
+        // Leaflet 이 타일·마커를 400~700 에 깔아요. z-index 를 안 주면 이 카드가
+        // 지도 밑으로 들어가서, 핀을 눌러도 아무 일도 안 일어난 것처럼 보입니다.
+        zIndex: 1000,
         maxHeight: "70%",
         overflowY: "auto",
         background: palette.card,
