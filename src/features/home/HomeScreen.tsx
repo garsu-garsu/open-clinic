@@ -30,7 +30,7 @@ type Tab = "map" | "list";
 
 export function HomeScreen() {
   const [phase, setPhase] = useState<Phase>({ k: "locating" });
-  const [tab, setTab] = useState<Tab>("list");
+  const [tab, setTab] = useState<Tab>("map");
   const [kind, setKind] = useState<Kind>(0);
   const [radius, setRadius] = useState<Radius>(3000);
   const [onlyOpen, setOnlyOpen] = useState(true);
@@ -171,8 +171,8 @@ export function HomeScreen() {
           background: palette.white,
         }}
       >
-        <TabButton active={tab === "list"} onClick={() => setTab("list")} label="목록" />
         <TabButton active={tab === "map"} onClick={() => setTab("map")} label="지도" />
+        <TabButton active={tab === "list"} onClick={() => setTab("list")} label="목록" />
       </nav>
     </div>
   );
