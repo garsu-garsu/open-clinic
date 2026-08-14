@@ -114,7 +114,7 @@ export function HomeScreen() {
 
             {tab === "map" ? (
               <div style={{ position: "absolute", inset: `${HEADER}px 0 0`, overflow: "hidden" }}>
-                <MapView me={phase.me} toilets={list} radius={radius} onSelect={setPicked} />
+                <MapView me={phase.me} places={list} radius={radius} onSelect={setPicked} />
                 {picked != null && (
                   <DetailSheet
                     p={picked}

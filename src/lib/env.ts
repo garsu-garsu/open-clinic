@@ -14,12 +14,15 @@ export const AD_GROUP_ID_BANNER_IMAGE =
   import.meta.env.VITE_AD_GROUP_ID_BANNER_IMAGE ?? "";
 
 /**
- * 카카오맵 JavaScript 키.
- * 없으면 지도를 숨기고 목록만 보여줘요 — 지도가 없어도 앱은 제 역할을 해요.
+ * 배경지도 타일 주소.
  *
- * ⚠️ 카카오 개발자센터 > 앱 설정 > 플랫폼 > Web 에 아래 두 도메인을 꼭 등록하세요.
- *    등록 안 하면 SDK 가 무한 로딩에 걸려요.
- *      https://open-clinic.apps.tossmini.com
- *      https://open-clinic.private-apps.tossmini.com
+ * OpenStreetMap 을 씁니다. 인증키도 도메인 등록도 필요 없고,
+ * 앱인토스에서 실제로 도는 게 확인된 경로예요(그늘로가 이걸 씁니다).
+ *
+ * ⚠️ OSM 공식 타일 서버는 이용 정책상 대량 트래픽을 허용하지 않아요.
+ *    사용자가 늘면 타일 제공자를 따로 두거나 직접 호스팅해야 합니다.
+ *    ponytail: 출시하고 실제로 트래픽이 붙으면 그때 옮기세요.
  */
-export const KAKAO_JS_KEY = import.meta.env.VITE_KAKAO_JS_KEY ?? "";
+export const TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+
+export const TILE_ATTRIBUTION = "© OpenStreetMap 기여자";
