@@ -118,15 +118,13 @@ export function MapView({ me, places, radius, onSelect }: Props) {
       fillOpacity: 0.06,
     }).addTo(map);
     circleRef.current = circle;
-
-    // 반경을 바꾸면 배율도 따라와야 자연스러워요.
-    map.fitBounds(circle.getBounds(), { padding: [24, 24] });
   }, [radius, me.lat, me.lng]);
 
-  // 목록이 바뀌면 핀을 갈아끼워요.
+  // 목록이 바뀌면 핀을 갈아끼우고, 배율을 그 핀들에 맞춰요.
   useEffect(() => {
+    const map = mapRef.current;
     const layer = markersRef.current;
-    if (layer == null) return;
+    if (map == null || layer == null) return;
     layer.clearLayers();
 
     const nearest = [...places].sort((a, b) => a.distance - b.distance).slice(0, MAX_PINS);
@@ -143,7 +141,23 @@ export function MapView({ me, places, radius, onSelect }: Props) {
         .addTo(layer);
     }
     meRef.current?.bringToFront();
-  }, [places]);
+
+    /*
+     * 배율은 "찍힌 핀들"에 맞춰요, 반경 원 전체가 아니에요.
+     * 반경 원에 맞추면 — 예를 들어 3km 반경인데 근처 병원이 800곳이 넘어
+     * 50곳으로 잘라도 다 1km 안에 있는 경우 — 화면 한가운데 핀이 조그맣게
+     * 뭉쳐 있고 나머지는 텅 빈 지도가 됩니다. 반경 원은 참고용으로 그대로
+     * 그려 두고, 배율만 "지금 실제로 보여주는 핀"에 맞춥니다.
+     * 핀이 하나도 없으면 반경 원에 맞춰서 최소한 검색 범위는 보여줘요.
+     */
+    if (nearest.length > 0) {
+      const bounds = L.latLngBounds([[me.lat, me.lng]]);
+      for (const p of nearest) bounds.extend([p.lat, p.lng]);
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+    } else if (circleRef.current != null) {
+      map.fitBounds(circleRef.current.getBounds(), { padding: [24, 24] });
+    }
+  }, [places, me.lat, me.lng]);
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
