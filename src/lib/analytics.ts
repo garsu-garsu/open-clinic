@@ -38,6 +38,7 @@ export const EVENT = {
   locationGranted: "location_granted",
   locationDenied: "location_denied",
   nearbyFound: "nearby_found",
+  refreshTapped: "refresh_tapped",
   directionsOpened: "directions_opened",
   called: "called",
 } as const;

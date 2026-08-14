@@ -21,12 +21,39 @@ interface Props {
  * 서울 도심은 3km 안에 병원이 800곳 넘게 있어요. 다 찍으면 핀끼리 겹쳐서
  * 도로도 지명도 안 보이는 파란 덩어리가 됩니다. 지도를 켜는 이유가
  * "어디쯤 있나"를 보는 건데 그러면 아무것도 알 수 없어요.
- * 목록은 그대로 전부 보여주고, 지도에서만 가까운 순으로 잘라 찍습니다.
+ * 목록은 그대로 전부 보여주고, 지도에서만 잘라 찍습니다.
  *
  * ponytail: 50개 고정. 더 촘촘히 보여줘야 하면 배율에 따라 개수를 늘리거나
  *           마커 묶음(클러스터)을 붙이세요. 지금은 그럴 만한 이유가 없어요.
  */
 const MAX_PINS = 50;
+
+/**
+ * 반경을 몇 칸으로 쪼갤지. 거리순 상위 MAX_PINS 개만 뽑으면 도심에서는
+ * 다 1km 안쪽에 몰려서 반경을 넓혀도 지도가 그대로예요 — 반경 전체에
+ * 고르게 퍼뜨려야 반경을 바꾼 게 지도에 보입니다.
+ */
+const GRID_CELLS_ACROSS = 10;
+
+/** 반경을 격자로 나눠 칸마다 가장 가까운 곳만 남겨요(칸 하나 = 한 핀). */
+function spreadOut(sortedByDistance: Place[], me: LatLng, radius: number, max: number): Place[] {
+  const cellM = (radius * 2) / GRID_CELLS_ACROSS;
+  const mPerLat = 111_320;
+  const mPerLng = 111_320 * Math.cos((me.lat * Math.PI) / 180);
+
+  const seen = new Set<string>();
+  const picked: Place[] = [];
+  for (const p of sortedByDistance) {
+    const x = Math.floor(((p.lng - me.lng) * mPerLng) / cellM);
+    const y = Math.floor(((p.lat - me.lat) * mPerLat) / cellM);
+    const key = `${x},${y}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    picked.push(p);
+    if (picked.length >= max) break;
+  }
+  return picked;
+}
 
 /**
  * 지도.
@@ -118,17 +145,21 @@ export function MapView({ me, places, radius, onSelect }: Props) {
       fillOpacity: 0.06,
     }).addTo(map);
     circleRef.current = circle;
+
+    // 반경을 바꾸면 배율도 따라와야 자연스러워요. 핀은 격자로 반경 전체에
+    // 퍼뜨려 찍으니(spreadOut), 원에 맞춰도 가운데만 뭉치지 않아요.
+    map.fitBounds(circle.getBounds(), { padding: [24, 24] });
   }, [radius, me.lat, me.lng]);
 
-  // 목록이 바뀌면 핀을 갈아끼우고, 배율을 그 핀들에 맞춰요.
+  // 목록이 바뀌면 핀을 갈아끼워요.
   useEffect(() => {
-    const map = mapRef.current;
     const layer = markersRef.current;
-    if (map == null || layer == null) return;
+    if (layer == null) return;
     layer.clearLayers();
 
-    const nearest = [...places].sort((a, b) => a.distance - b.distance).slice(0, MAX_PINS);
-    for (const p of nearest) {
+    const byDistance = [...places].sort((a, b) => a.distance - b.distance);
+    const shown = spreadOut(byDistance, me, radius, MAX_PINS);
+    for (const p of shown) {
       // 닫힌 곳도 지도에는 보여주되 흐리게 해요. 지금 갈 수 있는 곳이
       // 먼저 눈에 들어와야 하니까요. 목록에서 빼버리면 "저기 있는데 왜 안 보이지"가 돼요.
       const dim = p.state === "closed" ? 0.5 : p.state === "unknown" ? 0.8 : 1;
@@ -141,23 +172,7 @@ export function MapView({ me, places, radius, onSelect }: Props) {
         .addTo(layer);
     }
     meRef.current?.bringToFront();
-
-    /*
-     * 배율은 "찍힌 핀들"에 맞춰요, 반경 원 전체가 아니에요.
-     * 반경 원에 맞추면 — 예를 들어 3km 반경인데 근처 병원이 800곳이 넘어
-     * 50곳으로 잘라도 다 1km 안에 있는 경우 — 화면 한가운데 핀이 조그맣게
-     * 뭉쳐 있고 나머지는 텅 빈 지도가 됩니다. 반경 원은 참고용으로 그대로
-     * 그려 두고, 배율만 "지금 실제로 보여주는 핀"에 맞춥니다.
-     * 핀이 하나도 없으면 반경 원에 맞춰서 최소한 검색 범위는 보여줘요.
-     */
-    if (nearest.length > 0) {
-      const bounds = L.latLngBounds([[me.lat, me.lng]]);
-      for (const p of nearest) bounds.extend([p.lat, p.lng]);
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
-    } else if (circleRef.current != null) {
-      map.fitBounds(circleRef.current.getBounds(), { padding: [24, 24] });
-    }
-  }, [places, me.lat, me.lng]);
+  }, [places, me.lat, me.lng, radius]);
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
@@ -184,7 +199,7 @@ export function MapView({ me, places, radius, onSelect }: Props) {
             whiteSpace: "nowrap",
           }}
         >
-          가까운 {MAX_PINS}곳만 표시 · 전체는 목록에서
+          일부만 표시 · 전체는 목록에서
         </div>
       )}
 

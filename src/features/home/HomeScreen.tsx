@@ -35,6 +35,9 @@ export function HomeScreen() {
   const [radius, setRadius] = useState<Radius>(3000);
   const [onlyOpen, setOnlyOpen] = useState(true);
   const [picked, setPicked] = useState<Place | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  // 다시 찾기 실패 안내. 목록은 그대로 두고 이 문구만 잠깐 보여줘요.
+  const [refreshNote, setRefreshNote] = useState<string | null>(null);
 
   const locate = useCallback(async () => {
     setPhase({ k: "locating" });
@@ -61,6 +64,32 @@ export function HomeScreen() {
     trackScreen("home");
     void locate();
   }, [locate]);
+
+  /**
+   * 이동 중에 위치가 바뀌었을 때 쓰는 "다시 찾기". locate() 와 달리 화면을
+   * 통째로 안 갈아요 — 실패해도 갖고 있던 목록을 그대로 두고 안내만 띄웁니다.
+   * 탭·반경·병원/약국·정렬 선택은 별개 state 라 건드리지 않아도 그대로 유지돼요.
+   */
+  const refresh = useCallback(async () => {
+    if (refreshing) return; // 연타 방지
+    track(EVENT.refreshTapped);
+    setRefreshing(true);
+    setRefreshNote(null);
+    try {
+      const loc = await Device.getLocation({ accuracy: 3 });
+      const me = { lat: loc.coords.latitude, lng: loc.coords.longitude };
+      // findNearby 가 시군구·날짜 캐시를 그대로 써요. 같은 시군구 안에서
+      // 움직였으면 새로 안 받고, 다른 시군구로 넘어갔을 때만 새로 받아옵니다.
+      // 거리·진료중 여부는 findNearby 안에서 항상 지금 시각 기준으로 새로 계산돼요.
+      const all = await findNearby(me, false, (partial) => setPhase({ k: "ready", me, all: partial }));
+      track(EVENT.nearbyFound, { count: all.length });
+    } catch {
+      setRefreshNote("위치를 다시 확인하지 못했어요.");
+      setTimeout(() => setRefreshNote(null), 3000);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshing]);
 
   const list = useMemo(
     () => (phase.k === "ready" ? filterPlaces(phase.all, kind, radius, onlyOpen) : []),
@@ -110,6 +139,9 @@ export function HomeScreen() {
               onlyOpen={onlyOpen}
               onOnlyOpen={setOnlyOpen}
               count={list.length}
+              refreshing={refreshing}
+              refreshNote={refreshNote}
+              onRefresh={() => void refresh()}
             />
 
             {tab === "map" ? (
@@ -146,7 +178,7 @@ export function HomeScreen() {
   );
 }
 
-const HEADER = 100;
+const HEADER = 132;
 
 /* ------------------------------------------------------------------ 조각 */
 
@@ -158,6 +190,9 @@ function Header({
   onlyOpen,
   onOnlyOpen,
   count,
+  refreshing,
+  refreshNote,
+  onRefresh,
 }: {
   kind: Kind;
   onKind: (k: Kind) => void;
@@ -166,6 +201,9 @@ function Header({
   onlyOpen: boolean;
   onOnlyOpen: (v: boolean) => void;
   count: number;
+  refreshing: boolean;
+  refreshNote: string | null;
+  onRefresh: () => void;
 }) {
   return (
     <div
@@ -201,7 +239,28 @@ function Header({
           onClick={() => onOnlyOpen(!onlyOpen)}
           label="지금 열린 곳"
         />
-        <span style={{ marginLeft: "auto", fontSize: 13, color: palette.sub }}>{count}곳</span>
+      </div>
+
+      {/* 개수 + 다시 찾기 — 지도·목록 두 탭이 이 줄을 같이 써요. */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
+        <span style={{ fontSize: 13, color: refreshNote != null ? palette.unknown : palette.sub }}>
+          {refreshNote ?? `${count}곳`}
+        </span>
+        <button
+          onClick={onRefresh}
+          disabled={refreshing}
+          style={{
+            border: "none",
+            borderRadius: 999,
+            padding: "6px 12px",
+            fontSize: 13,
+            fontWeight: 700,
+            color: refreshing ? palette.sub : palette.primary,
+            background: "rgba(20,24,31,0.06)",
+          }}
+        >
+          {refreshing ? "찾는 중…" : "다시 찾기"}
+        </button>
       </div>
     </div>
   );
