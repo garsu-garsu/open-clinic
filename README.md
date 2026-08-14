@@ -2,35 +2,22 @@
 
 내 주변에서 **지금 열려 있는** 공중화장실을 가까운 순으로 보여주는 앱인토스 미니앱.
 
-## 서버가 없습니다
+## 데이터는 런타임에 직접 불러옵니다
 
-공중화장실 위치는 변하지 않아서, 빌드할 때 정적 파일로 구워둡니다.
-런타임에 부르는 외부 API가 없으므로 API 키 노출도 CORS 문제도 없어요.
+병·의원/약국 정보는 앱을 열 때마다 공공데이터포털 API를 브라우저에서 바로 호출해요.
 
 ```
-public/data/cells/{y}_{x}.json   0.05도(약 5km) 격자 한 칸
+병의원   https://apis.data.go.kr/B552657/HsptlAsembySearchService/getHsptlMdcncListInfoInqire
+약국     https://apis.data.go.kr/B552657/ErmctInsttInfoInqireService/getParmacyListInfoInqire
 ```
 
-앱은 내 위치 주변 3×3 칸만 읽습니다. 전국 6만 건을 통째로 내려받지 않아요.
+이 API는 좌표 반경 검색이 없고 "시도/시군구 이름"으로만 조회가 돼요. 그래서 좌표만 아는
+앱이 가장 가까운 시군구를 고를 수 있게 `src/lib/districts.ts` 에 시군구 중심좌표 표를
+미리 구워 뒀습니다(`npm run districts` 로 재생성 — 자주 안 바뀌는 1회성 배치예요).
 
-## 데이터 만들기
-
-원본: [전국공중화장실표준데이터](https://www.data.go.kr/data/15012892/standard.do) (공공누리 — 저장·재배포 자유)
-
-**⚠️ 2025년 2월부터 이 데이터에서 위도·경도 제공이 중단됐어요.** 주소만 남아서 직접 좌표를 찍어야 합니다.
-
-```bash
-# 1) 위 링크에서 CSV를 받아 data/ 에 둡니다
-# 2) VWorld 지오코더 키를 발급받습니다 (https://www.vworld.kr, 무료)
-VWORLD_KEY=발급받은키 npm run data data/전국공중화장실표준데이터.csv
-```
-
-카카오·네이버 지오코딩은 **결과를 DB에 저장하는 게 약관 위반**이라 쓰지 않습니다.
-VWorld는 국토부 공공데이터라 저장·재배포가 됩니다.
-
-지오코딩 결과는 `scripts/.geocache.json` 에 쌓여서, 중간에 끊고 다시 돌려도 이어집니다.
-
-커버리지를 넓히려면 [전국공공시설개방정보표준데이터](https://www.data.go.kr/data/15013117/standard.do)(관공서 개방 화장실)를 같은 스크립트로 한 번 더 돌려 합치세요. 공중화장실만으로는 도심 커버리지가 얕습니다.
+오늘 요일에 해당하는 시군구 데이터를 받아 `localStorage` 에 캐싱하고(날짜가 바뀌면
+자동으로 새로 받아요), 인증키는 `.env` 의 `VITE_DATA_KEY` 를 씁니다. 자세한 절충은
+`src/lib/env.ts` 주석을 보세요.
 
 ## 지도
 
@@ -51,9 +38,10 @@ https://open-clinic.private-apps.tossmini.com
 ## 명령어
 
 ```bash
-npm run dev          # 개발 서버
-npm run check:hours  # 개방시간 판정 자체 점검
+npm run dev             # 개발 서버
+npm run check:schedule  # 진료시간 판정 자체 점검
+npm run districts       # 시군구 중심좌표 표 재생성 (1회성 배치)
 npm run typecheck
-npm run build        # vite build + ait build (.ait 번들)
+npm run build           # vite build + ait build (.ait 번들)
 npm run deploy
 ```

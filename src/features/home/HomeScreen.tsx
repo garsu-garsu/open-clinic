@@ -42,9 +42,10 @@ export function HomeScreen() {
       const loc = await Device.getLocation({ accuracy: 3 });
       const me = { lat: loc.coords.latitude, lng: loc.coords.longitude };
       track(EVENT.locationGranted);
-      const all = await findNearby(me);
+      // 가장 가까운 시군구부터 순서대로 도착해요. 그때마다 화면을 바로 갱신해서
+      // 나머지 구를 기다리는 동안 빈 화면을 보여주지 않아요.
+      const all = await findNearby(me, false, (partial) => setPhase({ k: "ready", me, all: partial }));
       track(EVENT.nearbyFound, { count: all.length });
-      setPhase({ k: "ready", me, all });
     } catch (err) {
       const name = err instanceof Error ? err.name : "";
       if (name.includes("Permission")) {

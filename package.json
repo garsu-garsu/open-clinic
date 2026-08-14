@@ -9,8 +9,7 @@
     "deploy": "ait deploy",
     "lint": "eslint .",
     "typecheck": "tsc -b --force",
-    "data": "node scripts/build-places.mjs",
-    "probe": "node scripts/build-places.mjs --probe",
+    "districts": "node scripts/build-districts.mjs",
     "check:schedule": "node --experimental-strip-types scripts/check-schedule.ts"
   },
   "dependencies": {
@@ -28,6 +27,7 @@
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "puppeteer-core": "^25.7.0",
     "typescript": "~5.7.2",
     "vite": "^6.2.0"
   }
