@@ -29,10 +29,33 @@ type Phase =
 
 type Tab = "map" | "list";
 
+/**
+ * 주요 기능 딥링크로 들어오면 그 탭/구분부터 엽니다 — intoss://{앱}/list, /pharmacy.
+ * 경로 끝 조각과 ?screen= 둘 다 보고, 모르는 값이면 평소대로 기본값.
+ * (로또 알림이 쓰는 방식과 같아요.) tab 과 kind 는 서로 독립적으로 읽어요.
+ */
+function deepLinkScreen(): string | null {
+  try {
+    const { pathname, search } = window.location;
+    return new URLSearchParams(search).get("screen") ?? pathname.split("/").filter(Boolean).pop() ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function initialTab(): Tab {
+  const screen = deepLinkScreen();
+  return screen === "list" || screen === "map" ? screen : "map";
+}
+
+function initialKind(): Kind {
+  return deepLinkScreen() === "pharmacy" ? 1 : 0;
+}
+
 export function HomeScreen() {
   const [phase, setPhase] = useState<Phase>({ k: "locating" });
-  const [tab, setTab] = useState<Tab>("map");
-  const [kind, setKind] = useState<Kind>(0);
+  const [tab, setTab] = useState<Tab>(initialTab);
+  const [kind, setKind] = useState<Kind>(initialKind);
   const [radius, setRadius] = useState<Radius>(3000);
   const [onlyOpen, setOnlyOpen] = useState(true);
   const [picked, setPicked] = useState<Place | null>(null);
