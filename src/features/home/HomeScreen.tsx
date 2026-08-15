@@ -1,7 +1,8 @@
 import { Device } from "@apps-in-toss/web-framework";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
 import { ImageBannerAd } from "../../components/BannerAd";
+import { CoachMarks } from "../../components/CoachMarks";
 import { DetailSheet } from "../../components/DetailSheet";
 import { MapView } from "../../components/MapView";
 import { Card } from "../../components/ScreenLayout";
@@ -38,6 +39,13 @@ export function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   // 다시 찾기 실패 안내. 목록은 그대로 두고 이 문구만 잠깐 보여줘요.
   const [refreshNote, setRefreshNote] = useState<string | null>(null);
+
+  // 코치마크가 가리킬 요소들.
+  const kindRef = useRef<HTMLDivElement>(null);
+  const openNowRef = useRef<HTMLDivElement>(null);
+  const radiusRef = useRef<HTMLDivElement>(null);
+  const refreshRef = useRef<HTMLButtonElement>(null);
+  const tabsRef = useRef<HTMLDivElement>(null);
 
   const locate = useCallback(async () => {
     setPhase({ k: "locating" });
@@ -142,6 +150,21 @@ export function HomeScreen() {
               refreshing={refreshing}
               refreshNote={refreshNote}
               onRefresh={() => void refresh()}
+              kindRef={kindRef}
+              radiusRef={radiusRef}
+              openNowRef={openNowRef}
+              refreshRef={refreshRef}
+            />
+
+            <CoachMarks
+              storageKey="open-clinic:coach:v1"
+              steps={[
+                { ref: kindRef, title: "병원과 약국, 따로 볼 수 있어요", body: "탭 하나로 병원·의원과 약국을 바꿔가며 찾아보세요." },
+                { ref: openNowRef, title: "지금 문 연 곳만 보기", body: "지금 진료 중인 곳만 골라서 볼 수 있어요." },
+                { ref: radiusRef, title: "찾는 범위를 골라요", body: "얼마나 가까운 곳까지 찾을지 눌러서 정할 수 있어요." },
+                { ref: refreshRef, title: "자리를 옮겼다면", body: "이동했으면 눌러서 지금 위치로 다시 찾아보세요." },
+                { ref: tabsRef, title: "지도와 목록, 편한 걸로", body: "목록에서는 가까운 순으로 요일별 진료시간까지 볼 수 있어요." },
+              ]}
             />
 
             {tab === "map" ? (
@@ -164,6 +187,7 @@ export function HomeScreen() {
       </div>
 
       <nav
+        ref={tabsRef}
         style={{
           flexShrink: 0,
           display: "flex",
@@ -193,6 +217,10 @@ function Header({
   refreshing,
   refreshNote,
   onRefresh,
+  kindRef,
+  radiusRef,
+  openNowRef,
+  refreshRef,
 }: {
   kind: Kind;
   onKind: (k: Kind) => void;
@@ -204,6 +232,10 @@ function Header({
   refreshing: boolean;
   refreshNote: string | null;
   onRefresh: () => void;
+  kindRef: RefObject<HTMLDivElement>;
+  radiusRef: RefObject<HTMLDivElement>;
+  openNowRef: RefObject<HTMLDivElement>;
+  refreshRef: RefObject<HTMLButtonElement>;
 }) {
   return (
     <div
@@ -219,26 +251,30 @@ function Header({
       }}
     >
       {/* 병원 / 약국 */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+      <div ref={kindRef} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
         <Seg active={kind === 0} onClick={() => onKind(0)} label="병원·의원" />
         <Seg active={kind === 1} onClick={() => onKind(1)} label="약국" />
       </div>
 
       {/* 반경 + 지금 문 연 곳만 */}
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        {RADIUS_OPTIONS.map((r) => (
+        <div ref={radiusRef} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {RADIUS_OPTIONS.map((r) => (
+            <Chip
+              key={r}
+              active={radius === r}
+              onClick={() => onRadius(r)}
+              label={r < 1000 ? `${r}m` : `${r / 1000}km`}
+            />
+          ))}
+        </div>
+        <div ref={openNowRef}>
           <Chip
-            key={r}
-            active={radius === r}
-            onClick={() => onRadius(r)}
-            label={r < 1000 ? `${r}m` : `${r / 1000}km`}
+            active={onlyOpen}
+            onClick={() => onOnlyOpen(!onlyOpen)}
+            label="지금 열린 곳"
           />
-        ))}
-        <Chip
-          active={onlyOpen}
-          onClick={() => onOnlyOpen(!onlyOpen)}
-          label="지금 열린 곳"
-        />
+        </div>
       </div>
 
       {/* 개수 + 다시 찾기 — 지도·목록 두 탭이 이 줄을 같이 써요. */}
@@ -247,6 +283,7 @@ function Header({
           {refreshNote ?? `${count}곳`}
         </span>
         <button
+          ref={refreshRef}
           onClick={onRefresh}
           disabled={refreshing}
           style={{
