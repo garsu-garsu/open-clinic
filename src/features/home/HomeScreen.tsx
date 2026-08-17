@@ -1,15 +1,25 @@
 import { Device } from "@apps-in-toss/web-framework";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
-import { ImageBannerAd } from "../../components/BannerAd";
+import { BannerAd, ImageBannerAd } from "../../components/BannerAd";
 import { CoachMarks } from "../../components/CoachMarks";
 import { DetailSheet } from "../../components/DetailSheet";
+import { MapAppPicker } from "../../components/MapAppPicker";
 import { MapView } from "../../components/MapView";
 import { Card } from "../../components/ScreenLayout";
+import { useAdGate } from "../../hooks/useAdGate";
 import { EVENT, track, trackScreen } from "../../lib/analytics";
+import { AD_GROUP_ID_BANNER } from "../../lib/env";
 import { formatDistance, type LatLng } from "../../lib/geo";
 import {
   directionsUrl,
+  forgetMapApp,
+  mapAppName,
+  rememberMapApp,
+  savedMapApp,
+  type MapAppId,
+} from "../../lib/mapApps";
+import {
   filterPlaces,
   findNearby,
   RADIUS_OPTIONS,
@@ -18,7 +28,9 @@ import {
   type Place,
   type Radius,
 } from "../../lib/places";
+import { noteGoodExperience } from "../../lib/review";
 import { todayLabel } from "../../lib/schedule";
+import { sharePlace } from "../../lib/share";
 import { palette, stateStyle } from "../../theme";
 
 type Phase =
@@ -28,6 +40,15 @@ type Phase =
   | { k: "error"; message: string };
 
 type Tab = "map" | "list";
+
+// 10km 반경 잠금 해제 상태. 광고 시청 후 24시간 동안 광고 없이 유지돼요.
+const WIDE_KEY = "oc:wide-until";
+const WIDE_MS = 24 * 60 * 60 * 1000;
+
+function isWideOpen(): boolean {
+  const until = Number(localStorage.getItem(WIDE_KEY) ?? "0");
+  return Date.now() < until;
+}
 
 /**
  * 주요 기능 딥링크로 들어오면 그 탭/구분부터 엽니다 — intoss://{앱}/list, /pharmacy.
@@ -58,10 +79,32 @@ export function HomeScreen() {
   const [kind, setKind] = useState<Kind>(initialKind);
   const [radius, setRadius] = useState<Radius>(3000);
   const [onlyOpen, setOnlyOpen] = useState(true);
+  const [wideOpen, setWideOpen] = useState(isWideOpen);
+  const adGate = useAdGate();
   const [picked, setPicked] = useState<Place | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   // 다시 찾기 실패 안내. 목록은 그대로 두고 이 문구만 잠깐 보여줘요.
   const [refreshNote, setRefreshNote] = useState<string | null>(null);
+
+  // 어느 지도로 안내할지. null이면 아직 안 골랐다는 뜻이라 길찾기 때 물어봐요.
+  const [mapApp, setMapApp] = useState<MapAppId | null>(() => savedMapApp());
+  /** 지도를 고르는 동안 어디로 갈 참이었는지 들고 있어요. */
+  const [pendingGo, setPendingGo] = useState<Place | null>(null);
+  /** 전화·길찾기로 앱을 떠났는지. 돌아왔을 때 리뷰를 물어볼 판단에 써요. */
+  const leftForPlaceRef = useRef(false);
+
+  // 전화나 길찾기까지 하고 돌아온 순간 = 이 앱이 제 일을 한 순간.
+  // 리뷰는 그때만 물어봐요. 진입 직후에 뜨는 창은 심사 반려 사유입니다.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (!document.hidden && leftForPlaceRef.current) {
+        leftForPlaceRef.current = false;
+        noteGoodExperience();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
 
   // 코치마크가 가리킬 요소들.
   const kindRef = useRef<HTMLDivElement>(null);
@@ -122,6 +165,22 @@ export function HomeScreen() {
     }
   }, [refreshing]);
 
+  // 1km·3km 는 바로 적용. 10km 는 잠겨 있으면 광고를 다 봐야 열리고, 그 뒤 24시간은 바로 열려요.
+  const selectRadius = useCallback(
+    (r: Radius) => {
+      if (r !== 10000 || wideOpen) {
+        setRadius(r);
+        return;
+      }
+      adGate.watchThen(() => {
+        localStorage.setItem(WIDE_KEY, String(Date.now() + WIDE_MS));
+        setWideOpen(true);
+        setRadius(10000);
+      }, "radius_10km");
+    },
+    [wideOpen, adGate],
+  );
+
   const list = useMemo(
     () => (phase.k === "ready" ? filterPlaces(phase.all, kind, radius, onlyOpen) : []),
     [phase, kind, radius, onlyOpen],
@@ -131,12 +190,25 @@ export function HomeScreen() {
     if (picked != null && !list.includes(picked)) setPicked(null);
   }, [list, picked]);
 
-  const go = (p: Place) => {
-    track(EVENT.directionsOpened, { name: p.name });
-    void Device.openURL(directionsUrl(p));
+  /** 고른 지도로 실제로 넘겨요. */
+  const goWith = (app: MapAppId, p: Place) => {
+    track(EVENT.directionsOpened, { name: p.name, app });
+    leftForPlaceRef.current = true;
+    void Device.openURL(directionsUrl(app, { name: p.name, lat: p.lat, lng: p.lng }));
   };
+
+  /** 아직 지도를 안 골랐으면 고르는 창을 먼저 띄워요. */
+  const go = (p: Place) => {
+    if (mapApp == null) {
+      setPendingGo(p);
+      return;
+    }
+    goWith(mapApp, p);
+  };
+
   const call = (p: Place) => {
     track(EVENT.called, { name: p.name });
+    leftForPlaceRef.current = true;
     void Device.openURL(telUrl(p));
   };
 
@@ -174,7 +246,8 @@ export function HomeScreen() {
               kind={kind}
               onKind={setKind}
               radius={radius}
-              onRadius={setRadius}
+              onRadius={selectRadius}
+              wideOpen={wideOpen}
               onlyOpen={onlyOpen}
               onOnlyOpen={setOnlyOpen}
               count={list.length}
@@ -207,11 +280,38 @@ export function HomeScreen() {
                     onClose={() => setPicked(null)}
                     onGo={() => go(picked)}
                     onCall={() => call(picked)}
+                    onShare={() => void sharePlace(picked)}
                   />
                 )}
               </div>
             ) : (
-              <ListPane list={list} onGo={go} onCall={call} kind={kind} />
+              <ListPane
+                list={list}
+                onGo={go}
+                onCall={call}
+                kind={kind}
+                mapApp={mapApp}
+                onResetMapApp={() => {
+                  forgetMapApp();
+                  setMapApp(null);
+                }}
+              />
+            )}
+
+            {/* 길찾기를 눌렀을 때만 열려요. 진입 직후에 뜨는 창이 아닙니다. */}
+            {pendingGo != null && (
+              <MapAppPicker
+                onPick={(app, remember) => {
+                  if (remember) {
+                    rememberMapApp(app);
+                    setMapApp(app);
+                  }
+                  const target = pendingGo;
+                  setPendingGo(null);
+                  goWith(app, target);
+                }}
+                onClose={() => setPendingGo(null)}
+              />
             )}
           </>
         )}
@@ -250,6 +350,23 @@ export function HomeScreen() {
           <TabButton active={tab === "list"} onClick={() => setTab("list")} label="목록" icon="📋" />
         </div>
       </nav>
+
+      {/* 하단 고정 배너. locating/denied/error 단계에서 먼저 뜨면 흰 블록만 화면
+          아래에 남아 진입 직후 바텀시트처럼 보인다는 반려를 받았어요 — 그래서
+          첫 화면(지도·목록)이 준비된 뒤(phase === "ready")에만 자리를 만듭니다.
+          배너 그룹 ID가 없으면 BannerAd 가 null 을 그리니 그때도 자리를 안 만들어요. */}
+      {phase.k === "ready" && AD_GROUP_ID_BANNER !== "" && (
+        <div
+          style={{
+            flexShrink: 0,
+            height: 96,
+            paddingBottom: "env(safe-area-inset-bottom)",
+            background: "#FFFFFF",
+          }}
+        >
+          <BannerAd />
+        </div>
+      )}
     </div>
   );
 }
@@ -263,6 +380,7 @@ function Header({
   onKind,
   radius,
   onRadius,
+  wideOpen,
   onlyOpen,
   onOnlyOpen,
   count,
@@ -278,6 +396,7 @@ function Header({
   onKind: (k: Kind) => void;
   radius: Radius;
   onRadius: (r: Radius) => void;
+  wideOpen: boolean;
   onlyOpen: boolean;
   onOnlyOpen: (v: boolean) => void;
   count: number;
@@ -316,7 +435,13 @@ function Header({
               key={r}
               active={radius === r}
               onClick={() => onRadius(r)}
-              label={r < 1000 ? `${r}m` : `${r / 1000}km`}
+              label={
+                r < 1000
+                  ? `${r}m`
+                  : r === 10000 && !wideOpen
+                    ? "10km 광고보기"
+                    : `${r / 1000}km`
+              }
             />
           ))}
         </div>
@@ -399,11 +524,15 @@ function ListPane({
   onGo,
   onCall,
   kind,
+  mapApp,
+  onResetMapApp,
 }: {
   list: Place[];
   onGo: (p: Place) => void;
   onCall: (p: Place) => void;
   kind: Kind;
+  mapApp: MapAppId | null;
+  onResetMapApp: () => void;
 }) {
   return (
     <div
@@ -428,6 +557,42 @@ function ListPane({
       <div style={{ marginTop: 24 }}>
         <ImageBannerAd />
       </div>
+
+      {/* 지도 앱을 기억해 둔 사람에게만 되돌리는 줄을 보여줘요.
+          안드로이드 "기본으로 열기 초기화" 를 앱 안에서 하는 자리입니다. */}
+      {mapApp != null && (
+        <div
+          style={{
+            marginTop: 16,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
+            fontSize: 13,
+            color: palette.sub,
+          }}
+        >
+          <span>
+            길찾기는 <b style={{ color: palette.ink }}>{mapAppName(mapApp)}</b>로 열려요
+          </span>
+          <button
+            type="button"
+            onClick={onResetMapApp}
+            style={{
+              flexShrink: 0,
+              border: "none",
+              borderRadius: 10,
+              padding: "8px 12px",
+              fontSize: 13,
+              fontWeight: 700,
+              color: palette.primary,
+              background: "rgba(22,104,184,0.10)",
+            }}
+          >
+            다시 고르기
+          </button>
+        </div>
+      )}
 
       <p style={{ fontSize: 12, color: palette.sub, marginTop: 16, lineHeight: 1.6 }}>
         보건복지부 응급의료정보원 제공 진료시간 기준이에요. 방문 전 전화로 꼭 확인하세요.

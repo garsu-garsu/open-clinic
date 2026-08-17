@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "typecheck": "tsc -b --force",
     "districts": "node scripts/build-districts.mjs",
-    "check:schedule": "node --experimental-strip-types scripts/check-schedule.ts"
+    "check:schedule": "node --experimental-strip-types scripts/check-schedule.ts",
+    "check:growth": "node --experimental-strip-types scripts/check-growth.ts"
   },
   "dependencies": {
     "@apps-in-toss/web-framework": "^3.0.2",

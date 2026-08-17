@@ -12,6 +12,8 @@ export const DATA_KEY = import.meta.env.VITE_DATA_KEY ?? "";
 export const AD_GROUP_ID_BANNER = import.meta.env.VITE_AD_GROUP_ID_BANNER ?? "";
 export const AD_GROUP_ID_BANNER_IMAGE =
   import.meta.env.VITE_AD_GROUP_ID_BANNER_IMAGE ?? "";
+export const AD_GROUP_ID_REWARDED =
+  import.meta.env.VITE_AD_GROUP_ID_REWARDED ?? "";
 
 /**
  * 배경지도 타일 주소.

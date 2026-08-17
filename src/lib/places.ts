@@ -237,10 +237,8 @@ export function filterPlaces(
     .sort((a, b) => rank(a) - rank(b) || a.distance - b.distance);
 }
 
-/** 카카오맵 길찾기. 앱이 깔려 있으면 앱으로, 아니면 웹으로 열려요. */
-export function directionsUrl(p: Place): string {
-  return `https://map.kakao.com/link/to/${encodeURIComponent(p.name)},${p.lat},${p.lng}`;
-}
+/* 길찾기 주소는 `lib/mapApps.ts` 로 옮겼어요 — 사용자가 지도 앱을 고를 수 있게
+   되면서 카카오맵 한 곳으로 고정할 수 없어졌습니다. */
 
 export function telUrl(p: Place): string {
   return `tel:${p.tel.replace(/[^0-9+]/g, "")}`;

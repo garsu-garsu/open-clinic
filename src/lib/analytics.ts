@@ -33,6 +33,7 @@ export function trackScreen(name: string, params: Params = {}): void {
 
 export const EVENT = {
   adBannerImpression: "ad_banner_impression",
+  adRewarded: "ad_rewarded",
   shareCompleted: "share_completed",
   // 앱 고유
   locationGranted: "location_granted",

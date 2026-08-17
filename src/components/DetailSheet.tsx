@@ -12,11 +12,13 @@ export function DetailSheet({
   onClose,
   onGo,
   onCall,
+  onShare,
 }: {
   p: Place;
   onClose: () => void;
   onGo: () => void;
   onCall: () => void;
+  onShare: () => void;
 }) {
   const s = stateStyle(p.state);
   return (
@@ -102,6 +104,23 @@ export function DetailSheet({
           }}
         >
           길찾기
+        </button>
+        {/* "여기 문 열었대" 를 그대로 보낼 수 있게. 전화·길찾기보다 작게 둬요. */}
+        <button
+          onClick={onShare}
+          aria-label="이 곳 공유"
+          style={{
+            flexShrink: 0,
+            border: `1px solid ${palette.line}`,
+            borderRadius: 12,
+            padding: "14px 16px",
+            fontSize: 16,
+            fontWeight: 700,
+            color: palette.primary,
+            background: palette.white,
+          }}
+        >
+          공유
         </button>
       </div>
     </div>
