@@ -11,6 +11,7 @@ import { useAdGate } from "../../hooks/useAdGate";
 import { EVENT, track, trackScreen } from "../../lib/analytics";
 import { AD_GROUP_ID_BANNER } from "../../lib/env";
 import { formatDistance, type LatLng } from "../../lib/geo";
+import { isLocationAllowed } from "../../lib/locationPermission";
 import {
   directionsUrl,
   forgetMapApp,
@@ -34,6 +35,8 @@ import { sharePlace } from "../../lib/share";
 import { palette, stateStyle } from "../../theme";
 
 type Phase =
+  /** 아직 위치 권한이 없어서 사용자가 눌러주길 기다리는 상태. */
+  | { k: "needLocation" }
   | { k: "locating" }
   | { k: "ready"; me: LatLng; all: Place[] }
   | { k: "denied" }
@@ -74,7 +77,7 @@ function initialKind(): Kind {
 }
 
 export function HomeScreen() {
-  const [phase, setPhase] = useState<Phase>({ k: "locating" });
+  const [phase, setPhase] = useState<Phase>({ k: "needLocation" });
   const [tab, setTab] = useState<Tab>(initialTab);
   const [kind, setKind] = useState<Kind>(initialKind);
   const [radius, setRadius] = useState<Radius>(3000);
@@ -134,9 +137,14 @@ export function HomeScreen() {
     }
   }, []);
 
+  // 앱을 켜자마자 위치를 물으면 권한 바텀시트가 진입 직후 뜨고, 그게 심사
+  // 반려 사유입니다(20260817-15·20260818-16). 그래서 **이미 허용된 경우에만**
+  // 바로 찾고, 아직이면 버튼을 눌렀을 때 찾아요.
   useEffect(() => {
     trackScreen("home");
-    void locate();
+    void (async () => {
+      if (await isLocationAllowed()) void locate();
+    })();
   }, [locate]);
 
   /**
@@ -223,6 +231,15 @@ export function HomeScreen() {
       }}
     >
       <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
+        {phase.k === "needLocation" && (
+          <Center>
+            <Note
+              text="지금 문을 연 병원과 약국을 내 주변에서 찾아드려요."
+              action={{ label: "내 주변에서 찾기", onClick: () => void locate() }}
+            />
+          </Center>
+        )}
+
         {phase.k === "locating" && <Center><Note text="주변을 찾고 있어요…" /></Center>}
 
         {phase.k === "denied" && (
