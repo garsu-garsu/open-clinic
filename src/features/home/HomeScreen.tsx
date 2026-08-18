@@ -351,17 +351,21 @@ export function HomeScreen() {
         </div>
       </nav>
 
-      {/* 하단 고정 배너. locating/denied/error 단계에서 먼저 뜨면 흰 블록만 화면
-          아래에 남아 진입 직후 바텀시트처럼 보인다는 반려를 받았어요 — 그래서
-          첫 화면(지도·목록)이 준비된 뒤(phase === "ready")에만 자리를 만듭니다.
-          배너 그룹 ID가 없으면 BannerAd 가 null 을 그리니 그때도 자리를 안 만들어요. */}
-      {phase.k === "ready" && AD_GROUP_ID_BANNER !== "" && (
+      {/* 하단 고정 배너.
+          자리는 앱이 켜지는 순간부터 잡아두고, 배경도 화면색과 같게 둡니다.
+          위치를 잡은 뒤에 자리를 만들면(예전 방식) 화면이 다 그려진 다음 아래에서
+          블록이 올라오는 모양이 돼서, 심사에서 "접속 직후 바텀시트"로 반려됐어요
+          (20260817-15). 흰 배경으로 미리 잡아둔 것도 같은 이유로 반려된 적이
+          있으니(약궁합 20260816-8), 자리는 잡되 눈에 띄지 않게 두는 게 답이에요.
+          광고는 준비되면 이 자리 안에서 조용히 그려집니다.
+          배너 그룹 ID가 없으면 자리 자체를 만들지 않아요 — 빈 여백만 남습니다. */}
+      {AD_GROUP_ID_BANNER !== "" && (
         <div
           style={{
             flexShrink: 0,
             height: 96,
             paddingBottom: "env(safe-area-inset-bottom)",
-            background: "#FFFFFF",
+            background: palette.bg,
           }}
         >
           <BannerAd />
